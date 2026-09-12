@@ -241,9 +241,21 @@ export default function AdminPage() {
 
   const slugs = Object.keys(links).sort((a, b) => (links[b].createdAt || "").localeCompare(links[a].createdAt || ""));
 
+  const handleLogout = () => {
+    localStorage.removeItem("admin_password");
+    setPassword("");
+    setAuthed(false);
+    setLinks({});
+  };
+
   return (
     <div style={styles.page}>
-      <h1>Gestionnaire de liens NFC / QR</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <h1>Gestionnaire de liens NFC / QR</h1>
+        <button onClick={handleLogout} style={styles.secondaryButton}>
+          Se déconnecter
+        </button>
+      </div>
       <p style={{ color: "#555" }}>
         Chaque lien ci-dessous correspond à une URL fixe (celle à mettre sur le QR code imprimé et à écrire sur la puce NFC).
         Tu peux changer sa destination à tout moment sans réimprimer la carte.
