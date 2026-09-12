@@ -5,6 +5,21 @@ import { useEffect, useState, useCallback } from "react";
 const googleMapsSearchUrl = (businessName) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(businessName.trim())}`;
 
+const isGoogleMapsLink = (value) =>
+  /^https:\/\/(?:www\.)?google\.[^/]+\/maps\//i.test(value) ||
+  /^https:\/\/(?:maps\.app\.goo\.gl|goo\.gl|g\.page)\//i.test(value);
+
+async function convertToReviewLink(value, password) {
+  const response = await fetch("/api/review-link", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-admin-password": password },
+    body: JSON.stringify({ url: value }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Conversion impossible");
+  return data.reviewUrl;
+}
+
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
@@ -14,6 +29,7 @@ export default function AdminPage() {
   const [newDestination, setNewDestination] = useState("");
   const [newBusinessName, setNewBusinessName] = useState("");
   const [newSlug, setNewSlug] = useState("");
+  const [newLinkStatus, setNewLinkStatus] = useState("");
   const [qrPreview, setQrPreview] = useState({}); // slug -> blob url
   const [nfcStatus, setNfcStatus] = useState({}); // slug -> message
   const [batchCount, setBatchCount] = useState(20);
@@ -63,6 +79,21 @@ export default function AdminPage() {
   const handleLogin = (e) => {
     e.preventDefault();
     fetchLinks(password);
+  };
+
+  const handleNewDestinationChange = async (value) => {
+    setNewDestination(value);
+    setNewLinkStatus("");
+    if (!isGoogleMapsLink(value.trim())) return;
+
+    setNewLinkStatus("Conversion du lien Maps...");
+    try {
+      const reviewUrl = await convertToReviewLink(value.trim(), password);
+      setNewDestination(reviewUrl);
+      setNewLinkStatus("Lien d’avis direct créé ✓");
+    } catch (error) {
+      setNewLinkStatus(error.message);
+    }
   };
 
   const handleBatchCreate = async () => {
@@ -280,10 +311,11 @@ export default function AdminPage() {
         <input
           placeholder="Colle ici le lien direct pour laisser un avis Google"
           value={newDestination}
-          onChange={(e) => setNewDestination(e.target.value)}
+          onChange={(e) => handleNewDestinationChange(e.target.value)}
           style={styles.input}
           required
         />
+        {newLinkStatus && <p style={styles.conversionStatus}>{newLinkStatus}</p>}
         <input
           placeholder="Identifiant personnalisé (optionnel, ex: carte1)"
           value={newSlug}
@@ -365,6 +397,22 @@ export default function AdminPage() {
 function EditableRow({ slug, link, password, onSave }) {
   const [destination, setDestination] = useState(link.destination || "");
   const [businessName, setBusinessName] = useState(link.businessName || "");
+  const [linkStatus, setLinkStatus] = useState("");
+
+  const handleDestinationChange = async (value) => {
+    setDestination(value);
+    setLinkStatus("");
+    if (!isGoogleMapsLink(value.trim())) return;
+
+    setLinkStatus("Conversion du lien Maps...");
+    try {
+      const reviewUrl = await convertToReviewLink(value.trim(), password);
+      setDestination(reviewUrl);
+      setLinkStatus("Lien d’avis direct créé ✓");
+    } catch (error) {
+      setLinkStatus(error.message);
+    }
+  };
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -386,7 +434,7 @@ function EditableRow({ slug, link, password, onSave }) {
         )}
         <input
           value={destination}
-          onChange={(e) => setDestination(e.target.value)}
+          onChange={(e) => handleDestinationChange(e.target.value)}
           placeholder="Nouvelle destination"
           style={{ ...styles.input, flex: 2, minWidth: 200, marginBottom: 0 }}
         />
@@ -394,6 +442,7 @@ function EditableRow({ slug, link, password, onSave }) {
           Enregistrer
         </button>
       </div>
+      {linkStatus && <p style={styles.conversionStatus}>{linkStatus}</p>}
     </div>
   );
 }
@@ -472,6 +521,11 @@ const styles = {
     color: "#666",
     fontSize: 12,
     lineHeight: 1.4,
+  },
+  conversionStatus: {
+    margin: "-2px 0 8px",
+    color: "#555",
+    fontSize: 12,
   },
   deleteButton: {
     padding: "6px 10px",
