@@ -43,18 +43,15 @@ git push -u origin main
 2. Ajoute : `ADMIN_PASSWORD` = un mot de passe de ton choix (solide)
 3. Redéploie le projet (onglet **Deployments** → "..." sur le dernier → **Redeploy**)
 
-### 5. (Optionnel) Activer la recherche automatique de lien d'avis Google
-Cette fonctionnalité te permet de taper le nom d'un commerce dans le dashboard et de récupérer automatiquement son lien "rédiger un avis" — plus besoin de le chercher/copier à la main.
+### 5. Récupérer le lien d'avis d'un commerce
+Cette version n'utilise aucune API Google et ne demande donc ni compte Google Cloud, ni clé API, ni facturation.
 
-1. Va sur https://console.cloud.google.com et crée un projet (ou utilise un projet existant)
-2. Dans le menu, va sur **APIs & Services** → **Library**, cherche **"Places API"** → clique **Enable**
-3. Va sur **APIs & Services** → **Credentials** → **Create Credentials** → **API Key**
-4. Copie la clé générée (elle commence par `AIza...`)
-5. **Important** : clique sur la clé pour la restreindre — dans "API restrictions", sélectionne uniquement "Places API" (évite qu'elle soit utilisable pour autre chose si elle fuite)
-6. Dans Vercel → **Settings** → **Environment Variables**, ajoute `GOOGLE_PLACES_API_KEY` = ta clé
-7. Redéploie le projet
+1. Dans le dashboard, saisis le nom du commerce
+2. Clique sur **Rechercher ce commerce sur Google Maps**
+3. Ouvre la bonne fiche et récupère son lien **Demander des avis**
+4. Colle ce lien dans le champ de destination et enregistre
 
-**Coût** : Google offre 200$ de crédit gratuit par mois sur cette API, largement suffisant pour un usage de recherche de commerces (chaque recherche coûte une fraction de centime). Il faut cependant activer la facturation sur ton compte Google Cloud (carte bancaire requise), même si tu ne dépasseras probablement jamais le crédit gratuit — surveille ton usage dans la console si tu veux être tranquille.
+La plaque NFC/QR conservera son URL fixe et redirigera ensuite directement vers ce lien d'avis.
 
 ### 6. C'est prêt !
 Va sur `https://ton-projet.vercel.app/admin`, connecte-toi avec ton mot de passe, et crée ton premier lien.

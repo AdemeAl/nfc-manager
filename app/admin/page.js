@@ -2,6 +2,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 
+const googleMapsSearchUrl = (businessName) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(businessName.trim())}`;
+
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
@@ -13,9 +16,6 @@ export default function AdminPage() {
   const [newSlug, setNewSlug] = useState("");
   const [qrPreview, setQrPreview] = useState({}); // slug -> blob url
   const [nfcStatus, setNfcStatus] = useState({}); // slug -> message
-  const [placeResults, setPlaceResults] = useState([]);
-  const [placeSearchLoading, setPlaceSearchLoading] = useState(false);
-  const [placeSearchError, setPlaceSearchError] = useState("");
   const [batchCount, setBatchCount] = useState(20);
   const [batchPrefix, setBatchPrefix] = useState("carte");
   const [batchLoading, setBatchLoading] = useState(false);
@@ -63,40 +63,6 @@ export default function AdminPage() {
   const handleLogin = (e) => {
     e.preventDefault();
     fetchLinks(password);
-  };
-
-  useEffect(() => {
-    if (!authed || !newBusinessName || newBusinessName.trim().length < 2) {
-      setPlaceResults([]);
-      return;
-    }
-    const timeout = setTimeout(async () => {
-      setPlaceSearchLoading(true);
-      setPlaceSearchError("");
-      try {
-        const res = await fetch(`/api/places/search?q=${encodeURIComponent(newBusinessName)}`, {
-          headers: { "x-admin-password": password },
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          setPlaceSearchError(data.error || "Erreur de recherche");
-          setPlaceResults([]);
-        } else {
-          setPlaceResults(data.results || []);
-        }
-      } catch (e) {
-        setPlaceSearchError("Erreur de recherche");
-      }
-      setPlaceSearchLoading(false);
-    }, 500); // attend 500ms après la dernière frappe avant de chercher
-
-    return () => clearTimeout(timeout);
-  }, [newBusinessName, authed, password]);
-
-  const selectPlace = (place) => {
-    setNewBusinessName(place.name);
-    setNewDestination(place.reviewUrl);
-    setPlaceResults([]);
   };
 
   const handleBatchCreate = async () => {
@@ -298,24 +264,21 @@ export default function AdminPage() {
           onChange={(e) => setNewBusinessName(e.target.value)}
           style={styles.input}
         />
-        {placeSearchLoading && <p style={{ fontSize: 13, color: "#777" }}>Recherche...</p>}
-        {placeSearchError && <p style={{ fontSize: 13, color: "red" }}>{placeSearchError}</p>}
-        {placeResults.length > 0 && (
-          <div style={styles.placeResultsBox}>
-            {placeResults.map((place) => (
-              <div
-                key={place.placeId}
-                onClick={() => selectPlace(place)}
-                style={styles.placeResultItem}
-              >
-                <strong>{place.name}</strong>
-                <div style={{ fontSize: 12, color: "#777" }}>{place.address}</div>
-              </div>
-            ))}
-          </div>
+        {newBusinessName.trim() && (
+          <a
+            href={googleMapsSearchUrl(newBusinessName)}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={styles.mapsButton}
+          >
+            Rechercher ce commerce sur Google Maps ↗
+          </a>
         )}
+        <p style={styles.helpText}>
+          Ouvre la bonne fiche, récupère son lien « Demander des avis », puis colle-le ci-dessous.
+        </p>
         <input
-          placeholder="URL de destination (ex: lien avis Google du commerce)"
+          placeholder="Colle ici le lien direct pour laisser un avis Google"
           value={newDestination}
           onChange={(e) => setNewDestination(e.target.value)}
           style={styles.input}
@@ -402,52 +365,25 @@ export default function AdminPage() {
 function EditableRow({ slug, link, password, onSave }) {
   const [destination, setDestination] = useState(link.destination || "");
   const [businessName, setBusinessName] = useState(link.businessName || "");
-  const [results, setResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState("");
-
-  useEffect(() => {
-    if (!businessName || businessName.trim().length < 2) {
-      setResults([]);
-      return;
-    }
-    const timeout = setTimeout(async () => {
-      setSearching(true);
-      setSearchError("");
-      try {
-        const res = await fetch(`/api/places/search?q=${encodeURIComponent(businessName)}`, {
-          headers: { "x-admin-password": password },
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          setSearchError(data.error || "Erreur de recherche");
-          setResults([]);
-        } else {
-          setResults(data.results || []);
-        }
-      } catch (e) {
-        setSearchError("Erreur de recherche");
-      }
-      setSearching(false);
-    }, 500);
-    return () => clearTimeout(timeout);
-  }, [businessName, password]);
-
-  const selectPlace = (place) => {
-    setBusinessName(place.name);
-    setDestination(place.reviewUrl);
-    setResults([]);
-  };
-
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <input
           value={businessName}
           onChange={(e) => setBusinessName(e.target.value)}
-          placeholder="Nom du commerce (recherche Google)"
+          placeholder="Nom du commerce"
           style={{ ...styles.input, flex: 1, minWidth: 150, marginBottom: 0 }}
         />
+        {businessName.trim() && (
+          <a
+            href={googleMapsSearchUrl(businessName)}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={styles.mapsButtonCompact}
+          >
+            Chercher sur Maps ↗
+          </a>
+        )}
         <input
           value={destination}
           onChange={(e) => setDestination(e.target.value)}
@@ -458,18 +394,6 @@ function EditableRow({ slug, link, password, onSave }) {
           Enregistrer
         </button>
       </div>
-      {searching && <p style={{ fontSize: 12, color: "#777", marginTop: 4 }}>Recherche...</p>}
-      {searchError && <p style={{ fontSize: 12, color: "red", marginTop: 4 }}>{searchError}</p>}
-      {results.length > 0 && (
-        <div style={styles.placeResultsBox}>
-          {results.map((place) => (
-            <div key={place.placeId} onClick={() => selectPlace(place)} style={styles.placeResultItem}>
-              <strong>{place.name}</strong>
-              <div style={{ fontSize: 12, color: "#777" }}>{place.address}</div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -521,6 +445,34 @@ const styles = {
     cursor: "pointer",
     fontSize: 13,
   },
+  mapsButton: {
+    display: "inline-block",
+    marginBottom: 8,
+    padding: "9px 12px",
+    borderRadius: 8,
+    background: "#e8f0fe",
+    color: "#174ea6",
+    textDecoration: "none",
+    fontSize: 13,
+    fontWeight: 600,
+  },
+  mapsButtonCompact: {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "9px 12px",
+    borderRadius: 8,
+    background: "#e8f0fe",
+    color: "#174ea6",
+    textDecoration: "none",
+    fontSize: 12,
+    fontWeight: 600,
+  },
+  helpText: {
+    margin: "0 0 8px",
+    color: "#666",
+    fontSize: 12,
+    lineHeight: 1.4,
+  },
   deleteButton: {
     padding: "6px 10px",
     borderRadius: 8,
@@ -529,18 +481,6 @@ const styles = {
     color: "#d33",
     cursor: "pointer",
     fontSize: 12,
-  },
-  placeResultsBox: {
-    border: "1px solid #ddd",
-    borderRadius: 8,
-    marginBottom: 8,
-    maxHeight: 200,
-    overflowY: "auto",
-  },
-  placeResultItem: {
-    padding: "10px 12px",
-    borderBottom: "1px solid #eee",
-    cursor: "pointer",
   },
   badgeAssigned: {
     fontSize: 11,
