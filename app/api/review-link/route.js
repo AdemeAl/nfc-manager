@@ -44,7 +44,16 @@ function buildReviewUrl(value) {
 
   const cidPair = decoded.match(/0x[0-9a-f]+:0x[0-9a-f]+/i)?.[0];
   if (cidPair) {
-    return `https://www.google.com/search?hl=fr#lrd=${cidPair},3,,,`;
+    const businessNameMatch = url.pathname.match(/\/maps\/place\/([^/]+)/i);
+    const businessName = businessNameMatch
+      ? decodeURIComponent(businessNameMatch[1]).replace(/\+/g, " ")
+      : "Avis Google";
+    const cidHex = cidPair.split(":")[1];
+    const ludocid = BigInt(cidHex).toString(10);
+
+    return `https://www.google.com/search?hl=fr&q=${encodeURIComponent(
+      businessName
+    )}&ludocid=${ludocid}#lrd=${cidPair},3`;
   }
 
   return null;
