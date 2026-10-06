@@ -84,3 +84,11 @@ Va sur `https://ton-projet.vercel.app/admin`, connecte-toi avec ton mot de passe
 - **Écriture NFC** : Web NFC ne fonctionne que sur **Chrome pour Android**, en HTTPS (donc uniquement une fois déployé sur Vercel, pas en local). Sur iPhone, il faudra utiliser une app tierce comme "NFC Tools" pour écrire la même URL sur la puce.
 - **Sécurité** : la protection par mot de passe est volontairement simple (adaptée à un usage perso/petite échelle). N'utilise pas un mot de passe que tu utilises ailleurs.
 - **Coût** : tout reste gratuit dans les limites des offres gratuites Vercel + Upstash (largement suffisant pour plusieurs centaines de cartes).
+
+## Installer l'app sur ton téléphone (PWA)
+
+Ouvre `https://ton-projet.vercel.app/admin` dans Chrome (Android) ou Safari (iPhone) :
+- **Android / Chrome** : menu ⋮ → **Installer l'application** (ou **Ajouter à l'écran d'accueil**).
+- **iPhone / Safari** : bouton Partager → **Sur l'écran d'accueil**.
+
+L'icône s'ouvre ensuite en plein écran, directement sur l'admin. Rien n'est stocké hors ligne : les données sont toujours à jour et nécessitent une connexion.

@@ -1,5 +1,6 @@
 "use client";
 
+import Logo from "../components/Logo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const SESSION_KEY = "admin_password";
@@ -182,6 +183,7 @@ export default function AdminPage() {
   if (!authed) {
     return (
       <main className="login">
+        <Logo size={56} />
         <h1 className="login-title">Accès administrateur</h1>
         <form
           className="login-form"
@@ -220,7 +222,10 @@ export default function AdminPage() {
     <main className="admin">
       <header className="admin-head">
         <div>
-          <h1 className="admin-title">Cartes NFC</h1>
+          <div className="admin-brand">
+            <Logo size={36} />
+            <h1 className="admin-title">Cartes NFC</h1>
+          </div>
           <p className="admin-intro">
             Chaque carte a un lien fixe, imprimé en QR code et écrit sur la puce. Tu changes sa destination quand tu la
             vends, sans rien réimprimer.

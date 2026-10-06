@@ -385,6 +385,10 @@ a {
   gap: 1rem;
 }
 
+.login > .logo {
+  margin-bottom: 1rem;
+}
+
 .login-title {
   font-size: 1.6rem;
   font-weight: 720;
@@ -760,4 +764,19 @@ a {
   * {
     transition: none !important;
   }
+}
+
+.admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.logo {
+  flex: none;
+  display: block;
+}
+
+.admin-head .btn {
+  white-space: nowrap;
 }
