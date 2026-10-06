@@ -1,17 +1,9 @@
 import QRCode from "qrcode";
-import { checkAdminAuth } from "@/lib/auth";
+import { adminRoute, getOrigin } from "@/lib/api";
 
-export async function GET(request, { params }) {
-  if (!checkAdminAuth(request)) {
-    return new Response("Non autorisé", { status: 401 });
-  }
+export const GET = adminRoute(async (request, { params }) => {
   const { slug } = await params;
-
-  // On récupère l'URL de base depuis l'en-tête (fonctionne en local et sur Vercel)
-  const origin = request.headers.get("origin") || `https://${request.headers.get("host")}`;
-  const targetUrl = `${origin}/r/${slug}`;
-
-  const pngBuffer = await QRCode.toBuffer(targetUrl, {
+  const pngBuffer = await QRCode.toBuffer(`${getOrigin(request)}/r/${slug}`, {
     type: "png",
     width: 600,
     margin: 2,
@@ -23,4 +15,4 @@ export async function GET(request, { params }) {
       "Content-Disposition": `attachment; filename="qr-${slug}.png"`,
     },
   });
-}
+});

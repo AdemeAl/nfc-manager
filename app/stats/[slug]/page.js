@@ -1,121 +1,188 @@
-"use client";
+import Wave from "../../components/Wave";
+import { getLink, getScanStats } from "@/lib/redis";
+import { safeEqual } from "@/lib/auth";
+import { dayKey, shiftDay, weekdayInitial, longDate, shortDate } from "@/lib/dates";
 
-import { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+export const dynamic = "force-dynamic";
 
-export default function StatsPage() {
-  const params = useParams();
-  const searchParams = useSearchParams();
-  const slug = params.slug;
-  const key = searchParams.get("key");
+export const metadata = {
+  title: "Suivi de votre carte",
+  robots: { index: false, follow: false },
+  referrer: "no-referrer",
+};
 
-  const [data, setData] = useState(null);
-  const [error, setError] = useState("");
+const plural = (n, one, many) => (n === 1 ? one : many);
 
-  useEffect(() => {
-    if (!slug || !key) {
-      setError("Lien invalide.");
-      return;
-    }
-    fetch(`/api/public-stats/${slug}?key=${key}`)
-      .then(async (res) => {
-        const json = await res.json();
-        if (!res.ok) {
-          setError(json.error || "Erreur");
-        } else {
-          setData(json);
-        }
-      })
-      .catch(() => setError("Erreur de connexion."));
-  }, [slug, key]);
+export default async function StatsPage({ params, searchParams }) {
+  const { slug } = await params;
+  const { key } = await searchParams;
 
-  if (error) {
-    return (
-      <div style={styles.center}>
-        <p>{error}</p>
-      </div>
-    );
+  const link = await getLink(slug);
+  // Même message que le jeton soit faux ou la carte inexistante : on ne révèle rien.
+  if (!link || typeof key !== "string" || !safeEqual(key, link.clientToken)) {
+    return <Unavailable />;
   }
 
-  if (!data) {
-    return (
-      <div style={styles.center}>
-        <p>Chargement...</p>
-      </div>
-    );
-  }
+  const stats = await getScanStats(slug);
+  const byDay = stats.byDay || {};
+  const today = dayKey();
+  const count = (daysAgo) => byDay[shiftDay(today, -daysAgo)] || 0;
+  const sum = (from, to) => {
+    let total = 0;
+    for (let i = from; i <= to; i++) total += count(i);
+    return total;
+  };
 
-  // Prépare les 14 derniers jours pour le petit graphique
+  const last30 = sum(0, 29);
+  const thisWeek = sum(0, 6);
+  const previousWeek = sum(7, 13);
+  const total = stats.total || 0;
+
+  // 14 jours, du plus ancien au plus récent
   const days = [];
   for (let i = 13; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    days.push({ date: key, label: d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }), count: data.byDay[key] || 0 });
+    const dayStr = shiftDay(today, -i);
+    days.push({ key: dayStr, count: byDay[dayStr] || 0, isToday: i === 0 });
   }
-  const maxCount = Math.max(...days.map((d) => d.count), 1);
+  const peak = Math.max(...days.map((d) => d.count));
+  const bestDay = peak > 0 ? days.find((d) => d.count === peak) : null;
 
-  const thisWeek = days.slice(7).reduce((sum, d) => sum + d.count, 0);
+  const headline =
+    last30 === 0
+      ? total === 0
+        ? "Votre carte n'a pas encore été scannée."
+        : "Votre carte n'a pas été scannée ces 30 derniers jours."
+      : `Votre carte a été scannée ${last30} fois ces 30 derniers jours.`;
+
+  const difference = thisWeek - previousWeek;
+  const trend =
+    previousWeek === 0
+      ? null
+      : difference === 0
+        ? { dir: "same", text: "Autant que la semaine précédente" }
+        : difference > 0
+          ? { dir: "up", text: `${difference} de plus que la semaine précédente` }
+          : { dir: "down", text: `${Math.abs(difference)} de moins que la semaine précédente` };
 
   return (
-    <div style={styles.page}>
-      <h1 style={{ marginBottom: 4 }}>{data.businessName || "Votre carte avis Google"}</h1>
-      <p style={{ color: "#777", marginTop: 0 }}>Suivi en temps réel de votre carte</p>
-
-      <div style={styles.statsRow}>
-        <div style={styles.statCard}>
-          <div style={styles.statNumber}>{data.total}</div>
-          <div style={styles.statLabel}>scans au total</div>
+    <main>
+      <div className="band">
+        <div className="band-inner">
+          {link.businessName && <p className="band-name">{link.businessName}</p>}
+          <h1 className="band-title">{headline}</h1>
         </div>
-        <div style={styles.statCard}>
-          <div style={styles.statNumber}>{thisWeek}</div>
-          <div style={styles.statLabel}>cette semaine</div>
-        </div>
+        <Wave />
       </div>
 
-      <h3 style={{ marginTop: 30 }}>Derniers 14 jours</h3>
-      <div style={styles.chart}>
-        {days.map((d) => (
-          <div key={d.date} style={styles.barWrapper}>
-            <div
-              style={{
-                ...styles.bar,
-                height: `${Math.max((d.count / maxCount) * 100, 4)}%`,
-              }}
-              title={`${d.count} scan(s)`}
-            />
-            <div style={styles.barLabel}>{d.label}</div>
+      <div className="page-body">
+        <dl className="facts">
+          <div className="fact">
+            <dt>Ces 7 derniers jours</dt>
+            <dd>
+              <span className="fact-number">{thisWeek}</span>
+              {trend && <span className={`trend trend-${trend.dir}`}>{trend.text}</span>}
+            </dd>
           </div>
-        ))}
+          <div className="fact">
+            <dt>Les 7 jours d'avant</dt>
+            <dd>
+              <span className="fact-number">{previousWeek}</span>
+            </dd>
+          </div>
+          <div className="fact">
+            <dt>Depuis l'activation de la carte</dt>
+            <dd>
+              <span className="fact-number">{total}</span>
+            </dd>
+          </div>
+        </dl>
+
+        <figure className="chart-block">
+          <figcaption className="chart-title">
+            Scans par jour, du {shortDate(days[0].key)} au {shortDate(days[days.length - 1].key)}
+          </figcaption>
+          <div className="chart" aria-hidden="true">
+            {days.map((d) => (
+              <div className="chart-col" key={d.key}>
+                <div className="chart-track">
+                  <div
+                    className={`chart-bar${d.count === peak && peak > 0 ? " is-peak" : ""}${d.count === 0 ? " is-empty" : ""}`}
+                    style={{ "--value": peak > 0 ? Math.round((d.count / peak) * 100) : 0 }}
+                  >
+                    {d.count > 0 && d.count === peak && <span className="chart-value">{d.count}</span>}
+                  </div>
+                </div>
+                <span className={`chart-day${d.isToday ? " is-today" : ""}`}>{weekdayInitial(d.key)}</span>
+              </div>
+            ))}
+          </div>
+          <table className="visually-hidden">
+            <caption>Scans par jour</caption>
+            <thead>
+              <tr>
+                <th scope="col">Jour</th>
+                <th scope="col">Scans</th>
+              </tr>
+            </thead>
+            <tbody>
+              {days.map((d) => (
+                <tr key={d.key}>
+                  <th scope="row">{longDate(d.key)}</th>
+                  <td>{d.count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {bestDay && (
+            <p className="chart-note">
+              Meilleur jour : {longDate(bestDay.key)}, {bestDay.count} {plural(bestDay.count, "scan", "scans")}.
+            </p>
+          )}
+        </figure>
+
+        <p className="muted explain">
+          Un scan, c'est un client qui a posé son téléphone sur la carte ou scanné son QR code, puis ouvert votre page
+          d'avis Google. Cela ne veut pas dire qu'il a laissé un avis. Les visites de robots et les passages répétés en
+          quelques secondes ne sont pas comptés.
+        </p>
+
+        <Contact />
       </div>
-    </div>
+    </main>
   );
 }
 
-const styles = {
-  page: { maxWidth: 600, margin: "0 auto", padding: 24, fontFamily: "system-ui, sans-serif" },
-  center: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif" },
-  statsRow: { display: "flex", gap: 16, marginTop: 20 },
-  statCard: {
-    flex: 1,
-    background: "#111",
-    color: "white",
-    borderRadius: 14,
-    padding: "20px 16px",
-    textAlign: "center",
-  },
-  statNumber: { fontSize: 32, fontWeight: 700 },
-  statLabel: { fontSize: 13, opacity: 0.8, marginTop: 4 },
-  chart: {
-    display: "flex",
-    alignItems: "flex-end",
-    gap: 4,
-    height: 160,
-    borderBottom: "1px solid #ddd",
-    paddingBottom: 4,
-    marginTop: 10,
-  },
-  barWrapper: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" },
-  bar: { width: "70%", background: "#111", borderRadius: "4px 4px 0 0", minHeight: 3 },
-  barLabel: { fontSize: 9, color: "#999", marginTop: 4, transform: "rotate(-40deg)", whiteSpace: "nowrap" },
-};
+function Contact() {
+  const businessName = process.env.BUSINESS_NAME;
+  const email = process.env.CONTACT_EMAIL;
+  const phone = process.env.CONTACT_PHONE;
+  if (!email && !phone) return null;
+  return (
+    <p className="muted">
+      Une question sur votre carte ?{" "}
+      {email && <a href={`mailto:${email}`}>{email}</a>}
+      {email && phone && " ou "}
+      {phone && <a href={`tel:${phone.replace(/\s+/g, "")}`}>{phone}</a>}
+      {businessName ? ` — ${businessName}` : ""}
+    </p>
+  );
+}
+
+function Unavailable() {
+  return (
+    <main>
+      <div className="band">
+        <div className="band-inner">
+          <h1 className="band-title">Ce lien de suivi n'est pas valide.</h1>
+        </div>
+        <Wave />
+      </div>
+      <div className="page-body">
+        <p className="lead">
+          Utilisez le lien exact qui vous a été envoyé. S'il ne fonctionne plus, demandez-en un nouveau.
+        </p>
+        <Contact />
+      </div>
+    </main>
+  );
+}

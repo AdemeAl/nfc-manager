@@ -1,31 +1,27 @@
 import QRCode from "qrcode";
 import JSZip from "jszip";
-import { checkAdminAuth } from "@/lib/auth";
+import { NextResponse } from "next/server";
+import { adminRoute, getOrigin } from "@/lib/api";
 
-export async function POST(request) {
-  if (!checkAdminAuth(request)) {
-    return new Response("Non autorisé", { status: 401 });
-  }
+export const POST = adminRoute(async (request) => {
   const { slugs } = await request.json();
   if (!Array.isArray(slugs) || slugs.length === 0) {
-    return new Response("Liste de slugs vide", { status: 400 });
+    return NextResponse.json({ error: "Liste de cartes vide" }, { status: 400 });
   }
 
-  const origin = request.headers.get("origin") || `https://${request.headers.get("host")}`;
+  const origin = getOrigin(request);
   const zip = new JSZip();
 
   for (const slug of slugs) {
-    const targetUrl = `${origin}/r/${slug}`;
-    const pngBuffer = await QRCode.toBuffer(targetUrl, { type: "png", width: 600, margin: 2 });
-    zip.file(`qr-${slug}.png`, pngBuffer);
+    const png = await QRCode.toBuffer(`${origin}/r/${slug}`, { type: "png", width: 600, margin: 2 });
+    zip.file(`qr-${slug}.png`, png);
   }
 
   const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
-
   return new Response(zipBuffer, {
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="qr-codes.zip"`,
     },
   });
-}
+});

@@ -1,25 +1,42 @@
-import { NextResponse } from "next/server";
-import { getLink, recordScan } from "@/lib/redis";
+import { NextResponse, after } from "next/server";
+import { getLink, recordScan, firstVisitInWindow } from "@/lib/redis";
+import { looksLikeBot, visitorFingerprint } from "@/lib/bots";
+import { getOrigin } from "@/lib/api";
 
-// Cette route est PUBLIQUE (pas de mot de passe) : c'est elle qui est scannée
-// par le client final via le QR code ou tapée via le NFC.
+export const dynamic = "force-dynamic";
+
+// Route PUBLIQUE : c'est elle que le client final ouvre en scannant le QR code
+// ou en posant son téléphone sur la carte NFC.
 export async function GET(request, { params }) {
   const { slug } = await params;
-  const link = await getLink(slug);
+  const inactive = (reason) =>
+    NextResponse.redirect(new URL(`/inactive?reason=${reason}`, getOrigin(request)), { status: 307 });
 
-  if (!link || !link.destination) {
-    // Aucune destination configurée pour ce slug -> page d'attente
-    return new NextResponse(
-      `<html><body style="font-family:sans-serif;text-align:center;padding:60px;">
-        <h2>Ce lien n'est pas encore configuré.</h2>
-        <p>Revenez bientôt !</p>
-      </body></html>`,
-      { headers: { "Content-Type": "text/html; charset=utf-8" } }
-    );
+  const link = await getLink(slug);
+  if (!link) return inactive("unknown");
+  if (!link.destination) return inactive("blank");
+
+  let destination;
+  try {
+    destination = new URL(link.destination);
+    if (destination.protocol !== "https:" && destination.protocol !== "http:") throw new Error("protocole");
+  } catch {
+    return inactive("invalid");
   }
 
-  // On ne bloque jamais la redirection à cause d'un souci de tracking
-  recordScan(slug).catch(() => {});
+  // Le comptage se fait APRÈS l'envoi de la redirection (le client n'attend pas), mais
+  // `after` garantit que Vercel laisse la fonction finir le travail avant de la couper.
+  const countable = !looksLikeBot(request);
+  const fingerprint = visitorFingerprint(request);
+  after(async () => {
+    try {
+      if (countable && (await firstVisitInWindow(slug, fingerprint))) {
+        await recordScan(slug);
+      }
+    } catch (error) {
+      console.error("[scan]", error);
+    }
+  });
 
-  return NextResponse.redirect(link.destination, { status: 307 });
+  return NextResponse.redirect(destination, { status: 307 });
 }

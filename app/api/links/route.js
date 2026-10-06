@@ -1,25 +1,27 @@
 import { NextResponse } from "next/server";
-import { getAllLinks, upsertLink } from "@/lib/redis";
-import { checkAdminAuth } from "@/lib/auth";
 import { nanoid } from "nanoid";
+import { getAllLinks, getScanTotals, upsertLink } from "@/lib/redis";
+import { adminRoute } from "@/lib/api";
 
-export async function GET(request) {
-  if (!checkAdminAuth(request)) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-  }
+export const dynamic = "force-dynamic";
+
+export const GET = adminRoute(async () => {
   const links = await getAllLinks();
-  return NextResponse.json({ links });
-}
+  const scans = await getScanTotals(Object.keys(links));
+  return NextResponse.json({ links, scans });
+});
 
-export async function POST(request) {
-  if (!checkAdminAuth(request)) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+export const POST = adminRoute(async (request) => {
+  const { destination, businessName, customSlug } = await request.json();
+
+  const cleanSlug = (customSlug || "").trim().replace(/[^a-zA-Z0-9-_]/g, "-");
+  const slug = cleanSlug || nanoid(6);
+
+  const existing = (await getAllLinks())[slug];
+  if (existing) {
+    return NextResponse.json({ error: `L'identifiant « ${slug} » existe déjà.` }, { status: 409 });
   }
-  const body = await request.json();
-  const { destination, businessName, customSlug } = body;
 
-  const slug = customSlug?.trim() || nanoid(6);
-  const link = await upsertLink(slug, { destination: destination || "", businessName });
-
+  const link = await upsertLink(slug, { destination: destination || "", businessName: businessName || "" });
   return NextResponse.json({ slug, link });
-}
+});

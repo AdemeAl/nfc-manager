@@ -36,24 +36,30 @@ git push -u origin main
 1. Dans ton projet Vercel → onglet **Storage**
 2. Clique **Create Database** → choisis **Upstash** → **Redis**
 3. Suis les étapes (nom au choix, région proche de toi)
-4. Une fois créée, Vercel connecte automatiquement les variables `KV_REST_API_URL` et `KV_REST_API_TOKEN` à ton projet
+4. Une fois créée, Vercel connecte automatiquement les variables `STORAGE_KV_REST_API_URL` et `STORAGE_KV_REST_API_TOKEN` à ton projet (garde le préfixe « STORAGE »)
 
 ### 4. Ajouter ton mot de passe admin
 1. Dans ton projet Vercel → **Settings** → **Environment Variables**
 2. Ajoute : `ADMIN_PASSWORD` = un mot de passe de ton choix (solide)
 3. Redéploie le projet (onglet **Deployments** → "..." sur le dernier → **Redeploy**)
 
-### 5. Récupérer le lien d'avis d'un commerce
-Cette version n'utilise aucune API Google et ne demande donc ni compte Google Cloud, ni clé API, ni facturation.
+### 5. (Optionnel) Activer la recherche automatique de lien d'avis Google
+Cette fonctionnalité te permet de taper le nom d'un commerce dans le dashboard et de récupérer automatiquement son lien "rédiger un avis" — plus besoin de le chercher/copier à la main.
 
-1. Dans le dashboard, saisis le nom du commerce
-2. Clique sur **Rechercher ce commerce sur Google Maps**
-3. Ouvre la bonne fiche et récupère son lien **Demander des avis**
-4. Colle ce lien dans le champ de destination et enregistre
+1. Va sur https://console.cloud.google.com et crée un projet (ou utilise un projet existant)
+2. Dans le menu, va sur **APIs & Services** → **Library**, cherche **"Places API"** → clique **Enable**
+3. Va sur **APIs & Services** → **Credentials** → **Create Credentials** → **API Key**
+4. Copie la clé générée (elle commence par `AIza...`)
+5. **Important** : clique sur la clé pour la restreindre — dans "API restrictions", sélectionne uniquement "Places API" (évite qu'elle soit utilisable pour autre chose si elle fuite)
+6. Dans Vercel → **Settings** → **Environment Variables**, ajoute `GOOGLE_PLACES_API_KEY` = ta clé
+7. Redéploie le projet
 
-La plaque NFC/QR conservera son URL fixe et redirigera ensuite directement vers ce lien d'avis.
+**Coût** : Google offre 200$ de crédit gratuit par mois sur cette API, largement suffisant pour un usage de recherche de commerces (chaque recherche coûte une fraction de centime). Il faut cependant activer la facturation sur ton compte Google Cloud (carte bancaire requise), même si tu ne dépasseras probablement jamais le crédit gratuit — surveille ton usage dans la console si tu veux être tranquille.
 
-### 6. C'est prêt !
+### 6. (Optionnel) Coordonnées affichées aux clients
+Dans Vercel → Environment Variables, tu peux ajouter `BUSINESS_NAME`, `CONTACT_EMAIL` et `CONTACT_PHONE`. Ils apparaissent en bas de la page de suivi du commerçant et sur la page « carte pas encore activée ».
+
+### 7. C'est prêt !
 Va sur `https://ton-projet.vercel.app/admin`, connecte-toi avec ton mot de passe, et crée ton premier lien.
 
 ## Utilisation au quotidien
@@ -63,6 +69,15 @@ Va sur `https://ton-projet.vercel.app/admin`, connecte-toi avec ton mot de passe
 3. Clique **"Générer QR code"** → télécharge le PNG → imprime-le sur la carte
 4. Clique **"Écrire sur puce NFC"** (depuis ton téléphone Android + Chrome) → approche la carte → la puce est programmée avec cette même URL fixe
 5. Quand tu vends la carte à un commerce : reviens dans le dashboard, modifie la **destination** de ce lien vers le lien d'avis Google du commerce, clique "Enregistrer" — c'est tout, la carte pointe maintenant vers le bon endroit, sans rien réimprimer
+
+## Suivi pour tes clients
+
+- Chaque carte a une page de suivi privée : dans le dashboard, ouvre la carte → **Copier le lien de suivi**, et envoie-le au commerçant.
+- Les scans sont comptés sans robots ni doubles passages (20 s), par jour (heure de Paris), conservés 90 jours.
+- **Libérer la carte** (quand tu la reprends) vide la destination, remet les scans à zéro et invalide l'ancien lien de suivi.
+- **Créer un lot** continue la numérotation sans jamais écraser une carte existante. **Exporter en CSV** donne la liste complète.
+- Une carte vierge ou inconnue affiche une page d'attente claire au lieu d'une erreur.
+- `USE_MEMORY_DB=1` sert uniquement aux tests locaux : ne jamais le mettre sur Vercel.
 
 ## Notes importantes
 
